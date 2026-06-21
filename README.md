@@ -94,12 +94,12 @@ vercel dev
 
 | 処理 | メソッド・パス |
 |---|---|
-| ジョブ作成（アップロード先URL取得） | `POST /v1/accounts/{accountId}/jobs/bulk` |
-| ファイル本体のアップロード | `PUT <ジョブ作成レスポンスの _actions.upload_document[].url>`（Azure Blob Storageへ直接。`x-ms-blob-type: BlockBlob` ヘッダーが必須、Docusignの認証ヘッダーは不要） |
-| アップロード完了通知 | `POST /v1/accounts/{accountId}/jobs/bulk/{jobId}/actions/complete` |
-| ジョブステータス確認 | `GET /v1/accounts/{accountId}/jobs/bulk/{jobId}` |
+| ジョブ作成（アップロード先URL取得） | `POST /v1/accounts/{accountId}/upload/jobs` |
+| ファイル本体のアップロード | `PUT <ジョブ作成レスポンスの _embedded.documents[]._actions.upload_document>`（Azure Blob Storageへ直接。`x-ms-blob-type: BlockBlob` ヘッダーが必須、Docusignの認証ヘッダーは不要） |
+| アップロード完了通知 | `POST /v1/accounts/{accountId}/upload/jobs/{jobId}/actions/complete` |
+| ジョブステータス確認 | `GET /v1/accounts/{accountId}/upload/jobs/{jobId}` |
 
-（補足: 当初 `/upload/jobs` で実装していましたが、実機テストで返ってきた500エラーのレスポンスボディに `"path":".../jobs/bulk"` と記載されていたため、実際のパスが `/jobs/bulk` であると判明し修正しました。）
+（補足: 一時的に `/jobs/bulk` というパスに変更していましたが、これは500エラーのレスポンスボディに含まれていた `"path"` フィールド（サーバー内部のルーティング情報で、公開APIパスではなかった）を誤って参照したための誤りでした。正しい公開APIパスは `/upload/jobs` です。またレスポンス構造も `_embedded.documents[].{id, sequence, _actions.upload_document}`（`upload_document` は文字列のURL）が正しい形であることが判明したため、パース処理も合わせて修正しています。）
 
 ## 6. 制限事項・確認すべき点
 

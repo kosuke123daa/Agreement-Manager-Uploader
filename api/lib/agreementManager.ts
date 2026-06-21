@@ -3,27 +3,32 @@ import { getAccessToken } from "./docusignAuth.js"
 
 /**
  * Client for the Docusign Agreement Manager API "Bulk Upload" flow:
- * 1. POST /v1/accounts/{accountId}/jobs/bulk              — create a job,
+ * 1. POST /v1/accounts/{accountId}/upload/jobs              — create a job,
  *    get back a presigned Azure Blob Storage URL per document.
  * 2. PUT  <presigned URL>                                — upload the raw
  *    file bytes directly to Azure Blob Storage (no Docusign auth header).
- * 3. POST /v1/accounts/{accountId}/jobs/bulk/{jobId}/actions/complete
+ * 3. POST /v1/accounts/{accountId}/upload/jobs/{jobId}/actions/complete
  *                                                          — tell Docusign
  *    all files were uploaded so ingestion/AI extraction can start.
- * 4. GET  /v1/accounts/{accountId}/jobs/bulk/{jobId}      — poll job status
+ * 4. GET  /v1/accounts/{accountId}/upload/jobs/{jobId}      — poll job status
  *    (OPEN / IN_PROGRESS / COMPLETE / FAILED).
  *
- * Note: an earlier version of this client called `/upload/jobs`; a live
- * 500 response from Docusign echoed back `"path":".../jobs/bulk"`,
- * indicating the actual resource path is `/jobs/bulk`, not `/upload/jobs`.
+ * Note: an earlier version of this client mistakenly switched to
+ * `/jobs/bulk` after misreading a 500 error's echoed `"path"` field (which
+ * was just the server's internal route, not the public API path). The
+ * correct public path is `/upload/jobs`, confirmed against Docusign's
+ * Bulk Upload reference docs.
  */
 
 interface CreateJobResponse {
-  jobId: string
-  _actions: {
-    upload_document: Array<{
-      name: string
-      url: string
+  id: string
+  _embedded: {
+    documents: Array<{
+      id: string
+      sequence: number
+      _actions: {
+        upload_document: string
+      }
     }>
   }
 }
@@ -60,7 +65,7 @@ export async function createBulkUploadJob(filename: string) {
   const config = getDocusignConfig()
 
   const response = await docusignFetch(
-    `/v1/accounts/${config.accountId}/jobs/bulk`,
+    `/v1/accounts/${config.accountId}/upload/jobs`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -99,7 +104,7 @@ export async function completeBulkUploadJob(jobId: string) {
   const config = getDocusignConfig()
 
   await docusignFetch(
-    `/v1/accounts/${config.accountId}/jobs/bulk/${jobId}/actions/complete`,
+    `/v1/accounts/${config.accountId}/upload/jobs/${jobId}/actions/complete`,
     { method: "POST" }
   )
 }
@@ -108,7 +113,7 @@ export async function getBulkUploadJobStatus(jobId: string) {
   const config = getDocusignConfig()
 
   const response = await docusignFetch(
-    `/v1/accounts/${config.accountId}/jobs/bulk/${jobId}`,
+    `/v1/accounts/${config.accountId}/upload/jobs/${jobId}`,
     { method: "GET" }
   )
 

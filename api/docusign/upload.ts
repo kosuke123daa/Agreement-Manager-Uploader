@@ -60,24 +60,18 @@ export default async function handler(
     }
 
     const job = await createBulkUploadJob(filename)
-    const uploadTarget = job._actions.upload_document.find(
-      (doc) => doc.name === filename
-    )
-    if (!uploadTarget) {
+    const document = job._embedded.documents[0]
+    const uploadUrl = document?._actions.upload_document
+    if (!uploadUrl) {
       throw new Error(
         "Bulk upload job response did not include an upload URL for this file"
       )
     }
 
-    await uploadDocumentToBlobStorage(
-      uploadTarget.url,
-      filename,
-      fileBuffer,
-      contentType
-    )
-    await completeBulkUploadJob(job.jobId)
+    await uploadDocumentToBlobStorage(uploadUrl, filename, fileBuffer, contentType)
+    await completeBulkUploadJob(job.id)
 
-    res.status(200).json({ jobId: job.jobId, status: "submitted" })
+    res.status(200).json({ jobId: job.id, status: "submitted" })
   } catch (error) {
     console.error("Agreement Manager upload failed:", error)
     res.status(502).json({
