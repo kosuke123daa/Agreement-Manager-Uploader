@@ -94,10 +94,12 @@ vercel dev
 
 | 処理 | メソッド・パス |
 |---|---|
-| ジョブ作成（アップロード先URL取得） | `POST /v1/accounts/{accountId}/upload/jobs` |
+| ジョブ作成（アップロード先URL取得） | `POST /v1/accounts/{accountId}/jobs/bulk` |
 | ファイル本体のアップロード | `PUT <ジョブ作成レスポンスの _actions.upload_document[].url>`（Azure Blob Storageへ直接。`x-ms-blob-type: BlockBlob` ヘッダーが必須、Docusignの認証ヘッダーは不要） |
-| アップロード完了通知 | `POST /v1/accounts/{accountId}/upload/jobs/{jobId}/actions/complete` |
-| ジョブステータス確認 | `GET /v1/accounts/{accountId}/upload/jobs/{jobId}` |
+| アップロード完了通知 | `POST /v1/accounts/{accountId}/jobs/bulk/{jobId}/actions/complete` |
+| ジョブステータス確認 | `GET /v1/accounts/{accountId}/jobs/bulk/{jobId}` |
+
+（補足: 当初 `/upload/jobs` で実装していましたが、実機テストで返ってきた500エラーのレスポンスボディに `"path":".../jobs/bulk"` と記載されていたため、実際のパスが `/jobs/bulk` であると判明し修正しました。）
 
 ## 6. 制限事項・確認すべき点
 
