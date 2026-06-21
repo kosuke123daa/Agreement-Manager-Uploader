@@ -30,13 +30,17 @@ export default async function handler(
     return
   }
 
-  const filename = req.headers["x-filename"]
+  const rawFilename = req.headers["x-filename"]
   const contentType = req.headers["content-type"] || "application/pdf"
 
-  if (typeof filename !== "string" || !filename) {
+  if (typeof rawFilename !== "string" || !rawFilename) {
     res.status(400).json({ error: "Missing X-Filename header" })
     return
   }
+
+  // Header value is percent-encoded client-side to safely carry non-ASCII
+  // filenames (e.g. Japanese) over an HTTP header.
+  const filename = decodeURIComponent(rawFilename)
 
   if (!filename.toLowerCase().endsWith(".pdf")) {
     res.status(400).json({ error: "Only PDF files are supported" })

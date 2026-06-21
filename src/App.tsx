@@ -52,7 +52,9 @@ function App() {
         method: "POST",
         headers: {
           "Content-Type": file.type || "application/pdf",
-          "X-Filename": file.name,
+          // HTTP headers must be ISO-8859-1; percent-encode to safely carry
+          // non-ASCII filenames (e.g. Japanese), decoded server-side.
+          "X-Filename": encodeURIComponent(file.name),
         },
         body: file,
       })
