@@ -4,19 +4,19 @@ PDFをDocusign **Agreement Manager**（旧Navigator）に取り込む（ingest�
 
 ## 重要な前提（必読）
 
-DocuSignには厳密には「Agreement Manager」という名前のAPI製品は元々存在せず、2026年に **Navigator → Agreement Manager** へ名称変更されたものを指しています。Navigator時代のAPIはGET/DELETE/summarizeのみのベータ版で、文書のアップロードAPIは存在しませんでした。リブランドに伴い **Bulk Ingestion API**（ジョブを作成 → クラウドストレージへ直接アップロード → ジョブを完了、という3段構成）が追加された、という情報を確認しています。
+DocuSignには厳密には「Agreement Manager」という名前のAPI製品は元々存在せず、2026年に **Navigator → Agreement Manager** へ名称変更されたものを指しています。Navigator時代のAPIはGET/DELETE/summarizeのみのベータ版で、文書のアップロードAPIは存在しませんでした。リブランドに伴い **Bulk Upload API**（ジョブを作成 → Azure Blob Storageへ直接PUT → ジョブ完了通知、という3段構成）が追加されています。
 
-ただし、このセッションでは `developers.docusign.com` への直接アクセスが403で拒否されたため、**Bulk Ingestion APIの正確なパス・スコープ名は最終確認できていません**。`api/lib/agreementManager.ts` に実装したパスは妥当な推測ですが、**本番接続前に必ずDocuSignのAPI Explorer／最新の公式リファレンス（`https://developers.docusign.com/docs/agreement-manager-api/`）で実際のエンドポイントとスコープ名を確認してください**。ズレていた場合は `api/lib/agreementManager.ts` の1ファイルだけ直せば直ります。
+`developers.docusign.com` への直接アクセスが403で拒否されたため公式リファレンスでの完全な裏取りはできていませんが、社内で別途確認が取れた情報をもとに、エンドポイント・スコープを以下の内容で実装し直しました（`api/lib/agreementManager.ts`）。**それでも本番接続前には、DocuSignのAPI ExplorerまたはAgreement Manager APIの最新リファレンスで最終確認することを推奨します。**
 
 ## アーキテクチャ
 
 ```
 src/                      React (Vite) フロントエンド — PDFアップロードUI
-api/docusign/upload.ts    POST: PDFを受け取りAgreement Managerへ取り込みジョブを実行
-api/docusign/job-status.ts GET: 取り込みジョブのステータス確認
+api/docusign/upload.ts    POST: PDFを受け取りBulk Uploadジョブを実行
+api/docusign/job-status.ts GET: Bulk Uploadジョブのステータス確認
 api/docusign/consent-url.ts GET: 一度だけ必要な同意（コンセント）URLを生成
 api/lib/docusignAuth.ts   JWT Grantでアクセストークンを取得（プロセス内キャッシュ）
-api/lib/agreementManager.ts  Bulk Ingestion APIクライアント
+api/lib/agreementManager.ts  Bulk Upload APIクライアント
 ```
 
 認証方式は **JWT Grant**（サーバー間連携、特定の単一アカウントで自動実行する用途に適している。ユーザーがその場にいる必要がなく、トークンは1時間有効）を採用しています。
@@ -35,14 +35,22 @@ api/lib/agreementManager.ts  Bulk Ingestion APIクライアント
 
 JWT Grantでは、初回に一度だけ**個別ユーザー同意（individual consent）**をブラウザで取得する必要があります。同意していないと `consent_required` エラーになります。
 
-必要スコープ（暫定。上記の通り書き込み系スコープ名は要確認）：
-```
-signature impersonation adm_store_unified_repo_read adm_store_unified_repo_write
-```
+必要スコープ（Bulk Upload + Agreement Manager。eSignature用の `signature` `impersonation` の上に重ねる形で付与）：
+
+| スコープ | 用途 |
+|---|---|
+| `signature` | eSignature REST APIの基本スコープ（必須） |
+| `impersonation` | JWT Grantでのユーザー偽装（必須） |
+| `document_uploader_write` | Bulk Uploadジョブの作成・完了通知（`createBulkUploadJob` / 完了アクション）に必須 |
+| `document_uploader_read` | Bulk Uploadジョブのステータス取得（`getBulkUploadJobStatus`）に必須 |
+| `adm_store_unified_repo_write` | アップロードした文書からAgreementデータを書き込むために必須 |
+| `adm_store_unified_repo_read` | アップロード後のAgreementレコードの読み出し・検索のため、ほぼセットで付与 |
+| `public_dms_document_read` | Agreementの `download_url` からPDF本体をダウンロードする場合に必要（このアプリでは未使用だが二度目の同意を避けるため事前付与） |
+| `search_read` | Agreement一覧取得時に `$search` でテキスト検索する場合に必要（同上） |
 
 同意URLの形式（`account-d.docusign.com` はサンドボックス、本番は `account.docusign.com`）：
 ```
-https://account-d.docusign.com/oauth/auth?response_type=code&scope=signature%20impersonation%20adm_store_unified_repo_read%20adm_store_unified_repo_write&client_id=YOUR_INTEGRATION_KEY&redirect_uri=YOUR_REDIRECT_URI
+https://account-d.docusign.com/oauth/auth?response_type=code&scope=signature%20impersonation%20document_uploader_read%20document_uploader_write%20adm_store_unified_repo_read%20adm_store_unified_repo_write%20public_dms_document_read%20search_read&client_id=YOUR_INTEGRATION_KEY&redirect_uri=YOUR_REDIRECT_URI
 ```
 
 このアプリをデプロイ後、`GET /api/docusign/consent-url` にアクセスすると、設定済みの環境変数から自動生成されたURLが返ります。**そのURLをブラウザで開き、`DOCUSIGN_USER_ID` に指定したユーザーでログインして「Allow」をクリック**してください。これを1回行えば、以降はJWT Grantが裏側で自動的にトークンを取得します。
@@ -82,8 +90,17 @@ vercel dev
 ```
 （`vite.config.ts` の `server.proxy` で `/api` を `http://localhost:3000` へ転送する設定になっているので、`vercel dev` をポート3000で別途起動し、`npm run dev` のVite側からアクセスする構成です。）
 
-## 5. 制限事項・確認すべき点
+## 5. Bulk Upload APIのエンドポイント詳細
+
+| 処理 | メソッド・パス |
+|---|---|
+| ジョブ作成（アップロード先URL取得） | `POST /v1/accounts/{accountId}/upload/jobs` |
+| ファイル本体のアップロード | `PUT <ジョブ作成レスポンスの _actions.upload_document[].url>`（Azure Blob Storageへ直接。`x-ms-blob-type: BlockBlob` ヘッダーが必須、Docusignの認証ヘッダーは不要） |
+| アップロード完了通知 | `POST /v1/accounts/{accountId}/upload/jobs/{jobId}/actions/complete` |
+| ジョブステータス確認 | `GET /v1/accounts/{accountId}/upload/jobs/{jobId}` |
+
+## 6. 制限事項・確認すべき点
 
 - PDFは1ファイル最大25MBに制限（`api/docusign/upload.ts` の `MAX_FILE_SIZE_BYTES`、Agreement Manager側の実際の上限は要確認）
-- Bulk Ingestion APIの正確なエンドポイント・スコープ名は未検証（上記参照）
+- 上記エンドポイント・スコープは公式リファレンスへの直接アクセスができない環境で組んだため、本番接続前にDocuSign側で最終確認を推奨
 - JWTトークンはサーバーレス関数のプロセス内メモリにキャッシュされるため、コールドスタート時は毎回再認証されます。高頻度利用する場合はVercel KV等での永続キャッシュ化を検討してください

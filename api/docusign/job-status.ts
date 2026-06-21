@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node"
-import { getIngestionJobStatus } from "../lib/agreementManager"
+import { getBulkUploadJobStatus } from "../lib/agreementManager"
 
 export default async function handler(
   req: VercelRequest,
@@ -17,7 +17,7 @@ export default async function handler(
   }
 
   try {
-    const status = await getIngestionJobStatus(jobId)
+    const status = await getBulkUploadJobStatus(jobId)
     res.status(200).json(status)
   } catch (error) {
     console.error("Failed to fetch job status:", error)

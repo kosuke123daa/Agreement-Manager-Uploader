@@ -2,30 +2,31 @@ import { getDocusignConfig } from "./env"
 import { getAccessToken } from "./docusignAuth"
 
 /**
- * Client for the Docusign Agreement Manager API (formerly "Navigator API")
- * bulk ingestion flow: create a job, upload document(s) to the returned
- * cloud storage location, then mark the job complete.
- *
- * IMPORTANT: At the time this was written, Docusign's public docs for the
- * Agreement Manager bulk-ingestion endpoints were not reachable to verify
- * exact paths/payloads. The paths below are best-effort and ARE LIKELY TO
- * NEED ADJUSTMENT — confirm them against your account's API Explorer /
- * the current Agreement Manager API reference at
- * https://developers.docusign.com/docs/agreement-manager-api/ before
- * relying on this in production. All paths are centralized here so a fix
- * only needs to happen in one file.
+ * Client for the Docusign Agreement Manager API "Bulk Upload" flow:
+ * 1. POST /v1/accounts/{accountId}/upload/jobs           — create a job,
+ *    get back a presigned Azure Blob Storage URL per document.
+ * 2. PUT  <presigned URL>                                — upload the raw
+ *    file bytes directly to Azure Blob Storage (no Docusign auth header).
+ * 3. POST /v1/accounts/{accountId}/upload/jobs/{jobId}/actions/complete
+ *                                                          — tell Docusign
+ *    all files were uploaded so ingestion/AI extraction can start.
+ * 4. GET  /v1/accounts/{accountId}/upload/jobs/{jobId}    — poll job status
+ *    (OPEN / IN_PROGRESS / COMPLETE / FAILED).
  */
 
 interface CreateJobResponse {
   jobId: string
-  uploadUrl: string
-  uploadMethod?: string
-  uploadHeaders?: Record<string, string>
+  _actions: {
+    upload_document: Array<{
+      name: string
+      url: string
+    }>
+  }
 }
 
 interface JobStatusResponse {
   jobId: string
-  status: string
+  status: "OPEN" | "IN_PROGRESS" | "COMPLETE" | "FAILED" | string
   documents?: Array<{ name: string; status: string; agreementId?: string }>
 }
 
@@ -51,11 +52,11 @@ async function docusignFetch(path: string, init: RequestInit) {
   return response
 }
 
-export async function createIngestionJob(filename: string) {
+export async function createBulkUploadJob(filename: string) {
   const config = getDocusignConfig()
 
   const response = await docusignFetch(
-    `/v1/accounts/${config.accountId}/agreements/bulk`,
+    `/v1/accounts/${config.accountId}/upload/jobs`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -68,40 +69,42 @@ export async function createIngestionJob(filename: string) {
   return (await response.json()) as CreateJobResponse
 }
 
-export async function uploadDocumentToJob(
-  job: CreateJobResponse,
+export async function uploadDocumentToBlobStorage(
+  uploadUrl: string,
+  filename: string,
   fileBuffer: Buffer,
   contentType: string
 ) {
-  const response = await fetch(job.uploadUrl, {
-    method: job.uploadMethod || "PUT",
+  const response = await fetch(uploadUrl, {
+    method: "PUT",
     headers: {
+      "x-ms-blob-type": "BlockBlob",
+      "x-ms-meta-filename": filename,
       "Content-Type": contentType,
-      ...job.uploadHeaders,
     },
     body: fileBuffer as BodyInit,
   })
 
   if (!response.ok) {
     const body = await response.text()
-    throw new Error(`Document upload to cloud storage failed: ${body}`)
+    throw new Error(`Document upload to blob storage failed: ${body}`)
   }
 }
 
-export async function completeIngestionJob(jobId: string) {
+export async function completeBulkUploadJob(jobId: string) {
   const config = getDocusignConfig()
 
   await docusignFetch(
-    `/v1/accounts/${config.accountId}/agreements/bulk/${jobId}/complete`,
+    `/v1/accounts/${config.accountId}/upload/jobs/${jobId}/actions/complete`,
     { method: "POST" }
   )
 }
 
-export async function getIngestionJobStatus(jobId: string) {
+export async function getBulkUploadJobStatus(jobId: string) {
   const config = getDocusignConfig()
 
   const response = await docusignFetch(
-    `/v1/accounts/${config.accountId}/agreements/bulk/${jobId}`,
+    `/v1/accounts/${config.accountId}/upload/jobs/${jobId}`,
     { method: "GET" }
   )
 

@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node"
 import {
-  createIngestionJob,
-  uploadDocumentToJob,
-  completeIngestionJob,
+  createBulkUploadJob,
+  uploadDocumentToBlobStorage,
+  completeBulkUploadJob,
 } from "../lib/agreementManager"
 
 export const config = {
@@ -55,9 +55,23 @@ export default async function handler(
       return
     }
 
-    const job = await createIngestionJob(filename)
-    await uploadDocumentToJob(job, fileBuffer, contentType)
-    await completeIngestionJob(job.jobId)
+    const job = await createBulkUploadJob(filename)
+    const uploadTarget = job._actions.upload_document.find(
+      (doc) => doc.name === filename
+    )
+    if (!uploadTarget) {
+      throw new Error(
+        "Bulk upload job response did not include an upload URL for this file"
+      )
+    }
+
+    await uploadDocumentToBlobStorage(
+      uploadTarget.url,
+      filename,
+      fileBuffer,
+      contentType
+    )
+    await completeBulkUploadJob(job.jobId)
 
     res.status(200).json({ jobId: job.jobId, status: "submitted" })
   } catch (error) {
