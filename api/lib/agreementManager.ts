@@ -1,5 +1,5 @@
-import { getDocusignConfig } from "./env"
-import { getAccessToken } from "./docusignAuth"
+import { getDocusignConfig } from "./env.js"
+import { getAccessToken } from "./docusignAuth.js"
 
 /**
  * Client for the Docusign Agreement Manager API "Bulk Upload" flow:

@@ -3,7 +3,7 @@ import {
   createBulkUploadJob,
   uploadDocumentToBlobStorage,
   completeBulkUploadJob,
-} from "../lib/agreementManager"
+} from "../lib/agreementManager.js"
 
 export const config = {
   api: {

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node"
-import { getDocusignConfig } from "../lib/env"
+import { getDocusignConfig } from "../lib/env.js"
 
 /**
  * Returns the one-time individual consent URL that must be visited (logged

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node"
-import { getBulkUploadJobStatus } from "../lib/agreementManager"
+import { getBulkUploadJobStatus } from "../lib/agreementManager.js"
 
 export default async function handler(
   req: VercelRequest,

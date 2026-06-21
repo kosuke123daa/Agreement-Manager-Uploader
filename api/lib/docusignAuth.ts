@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken"
-import { getDocusignConfig } from "./env"
+import { getDocusignConfig } from "./env.js"
 
 interface CachedToken {
   accessToken: string
