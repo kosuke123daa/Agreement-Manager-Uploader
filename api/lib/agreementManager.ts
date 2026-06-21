@@ -22,6 +22,8 @@ import { getAccessToken } from "./docusignAuth.js"
 
 interface CreateJobResponse {
   id: string
+  name?: string
+  status: string
   _embedded: {
     documents: Array<{
       id: string
@@ -34,9 +36,12 @@ interface CreateJobResponse {
 }
 
 interface JobStatusResponse {
-  jobId: string
-  status: "OPEN" | "IN_PROGRESS" | "COMPLETE" | "FAILED" | string
-  documents?: Array<{ name: string; status: string; agreementId?: string }>
+  id: string
+  name?: string
+  status: "OPEN" | "UPLOAD_COMPLETE" | "IN_PROGRESS" | "COMPLETE" | "FAILED" | "CANCELED" | string
+  _embedded?: {
+    documents: Array<{ id: string; sequence: number; status?: string }>
+  }
 }
 
 async function docusignFetch(path: string, init: RequestInit) {
@@ -61,17 +66,18 @@ async function docusignFetch(path: string, init: RequestInit) {
   return response
 }
 
-export async function createBulkUploadJob(filename: string) {
+export async function createBulkUploadJob() {
   const config = getDocusignConfig()
 
+  // Docusign assigns the job (and a single pending document slot) from an
+  // empty body; the filename itself is supplied later via the
+  // x-ms-meta-filename header when uploading to the presigned blob URL.
   const response = await docusignFetch(
     `/v1/accounts/${config.accountId}/upload/jobs`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        documents: [{ name: filename }],
-      }),
+      body: JSON.stringify({}),
     }
   )
 
