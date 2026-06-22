@@ -69,15 +69,16 @@ async function docusignFetch(path: string, init: RequestInit) {
 export async function createBulkUploadJob() {
   const config = getDocusignConfig()
 
-  // Docusign assigns the job (and a single pending document slot) from an
-  // empty body; the filename itself is supplied later via the
-  // x-ms-meta-filename header when uploading to the presigned blob URL.
+  // Docusign's own curl example wraps the (empty) payload in a "body" key:
+  //   --data-raw '{ "body": {} }'
+  // The filename itself is supplied later via the x-ms-meta-filename header
+  // when uploading to the presigned blob URL, not in this request.
   const response = await docusignFetch(
     `/v1/accounts/${config.accountId}/upload/jobs`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ body: {} }),
     }
   )
 
