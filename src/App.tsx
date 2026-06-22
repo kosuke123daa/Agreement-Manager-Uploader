@@ -11,9 +11,20 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { FileText, Loader2, UploadCloud, CheckCircle2, XCircle } from "lucide-react"
+import { FileText, Loader2, UploadCloud, CheckCircle2, XCircle, ListChecks } from "lucide-react"
 
 type UploadState = "idle" | "uploading" | "success" | "error"
+
+interface AgreementListItem {
+  id: string
+  title?: string
+  type?: string
+  status?: string
+  file_name?: string
+  metadata?: {
+    created_at?: string
+  }
+}
 
 function App() {
   const [file, setFile] = useState<File | null>(null)
@@ -22,6 +33,10 @@ function App() {
   const [message, setMessage] = useState<string | null>(null)
   const [jobId, setJobId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const [agreements, setAgreements] = useState<AgreementListItem[] | null>(null)
+  const [agreementsLoading, setAgreementsLoading] = useState(false)
+  const [agreementsError, setAgreementsError] = useState<string | null>(null)
 
   const handleFile = useCallback((selected: File | null) => {
     setState("idle")
@@ -76,6 +91,24 @@ function App() {
     }
   }
 
+  const handleFetchAgreements = async () => {
+    setAgreementsLoading(true)
+    setAgreementsError(null)
+    try {
+      const response = await fetch("/api/docusign/agreements")
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || "一覧の取得に失敗しました。")
+      }
+      setAgreements(data.data ?? [])
+    } catch (error) {
+      setAgreementsError(error instanceof Error ? error.message : String(error))
+      setAgreements(null)
+    } finally {
+      setAgreementsLoading(false)
+    }
+  }
+
   const reset = () => {
     setFile(null)
     setState("idle")
@@ -86,7 +119,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-muted/30 p-6">
       <Card className="w-full max-w-lg">
         <CardHeader>
           <CardTitle>Agreement Manager アップロード</CardTitle>
@@ -177,6 +210,71 @@ function App() {
               リセット
             </Button>
           )}
+        </CardFooter>
+      </Card>
+
+      <Card className="w-full max-w-lg">
+        <CardHeader>
+          <CardTitle>最新の契約書一覧</CardTitle>
+          <CardDescription>
+            Agreement Managerに保存されている契約書を作成日の新しい順に10件取得します（GET動作確認用）。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {agreementsError && (
+            <Alert variant="destructive">
+              <XCircle />
+              <AlertTitle>エラー</AlertTitle>
+              <AlertDescription>{agreementsError}</AlertDescription>
+            </Alert>
+          )}
+
+          {agreements && agreements.length === 0 && !agreementsError && (
+            <p className="text-sm text-muted-foreground">
+              契約書が見つかりませんでした。
+            </p>
+          )}
+
+          {agreements && agreements.length > 0 && (
+            <ul className="space-y-2">
+              {agreements.map((agreement) => (
+                <li
+                  key={agreement.id}
+                  className="flex items-center justify-between gap-2 rounded-md border p-3 text-sm"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">
+                      {agreement.title || agreement.file_name || agreement.id}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {agreement.metadata?.created_at ?? "作成日不明"}
+                    </p>
+                  </div>
+                  {agreement.status && (
+                    <Badge variant="secondary">{agreement.status}</Badge>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+        <CardFooter>
+          <Button
+            onClick={handleFetchAgreements}
+            disabled={agreementsLoading}
+            variant="outline"
+            className="w-full"
+          >
+            {agreementsLoading ? (
+              <>
+                <Loader2 className="animate-spin" /> 取得中…
+              </>
+            ) : (
+              <>
+                <ListChecks /> 最新10件を取得
+              </>
+            )}
+          </Button>
         </CardFooter>
       </Card>
     </div>

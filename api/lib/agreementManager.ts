@@ -125,3 +125,41 @@ export async function getBulkUploadJobStatus(jobId: string) {
 
   return (await response.json()) as JobStatusResponse
 }
+
+interface AgreementListItem {
+  id: string
+  title?: string
+  type?: string
+  status?: string
+  file_name?: string
+  metadata?: {
+    created_at?: string
+  }
+}
+
+interface AgreementsListResponse {
+  data?: AgreementListItem[]
+  response_metadata?: {
+    page?: {
+      next_token?: string
+    }
+  }
+}
+
+// GET /v1/accounts/{accountId}/agreements (Agreement Manager "Agreements" API)
+export async function listRecentAgreements(limit: number) {
+  const config = getDocusignConfig()
+
+  const params = new URLSearchParams({
+    limit: String(limit),
+    sort: "metadata.created_at",
+    direction: "desc",
+  })
+
+  const response = await docusignFetch(
+    `/v1/accounts/${config.accountId}/agreements?${params.toString()}`,
+    { method: "GET" }
+  )
+
+  return (await response.json()) as AgreementsListResponse
+}
