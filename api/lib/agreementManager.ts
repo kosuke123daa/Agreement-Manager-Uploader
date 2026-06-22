@@ -58,8 +58,11 @@ async function docusignFetch(path: string, init: RequestInit) {
 
   if (!response.ok) {
     const body = await response.text()
+    const correlationId = response.headers.get("x-ds-correlation-id")
     throw new Error(
-      `Agreement Manager API request failed (${response.status}) for ${path}: ${body}`
+      `Agreement Manager API request failed (${response.status}) for ${path}` +
+        (correlationId ? ` [x-ds-correlation-id: ${correlationId}]` : "") +
+        `: ${body}`
     )
   }
 
