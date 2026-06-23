@@ -278,11 +278,16 @@ function App() {
               {agreements.map((agreement) => (
                 <li
                   key={agreement.id}
-                  className="flex items-center justify-between gap-2 rounded-md border p-3 text-sm"
+                  onClick={() => setLinkAgreementId(agreement.id)}
+                  className="flex items-center justify-between gap-2 rounded-md border p-3 text-sm cursor-pointer hover:border-primary/50 transition-colors"
+                  title="クリックでひも付けカードのagreementIdに入力"
                 >
                   <div className="min-w-0">
                     <p className="font-medium truncate">
                       {agreement.title || agreement.file_name || agreement.id}
+                    </p>
+                    <p className="text-xs text-muted-foreground font-mono truncate">
+                      {agreement.id}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {agreement.metadata?.created_at ?? "作成日不明"}
