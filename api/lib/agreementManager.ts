@@ -100,11 +100,13 @@ export async function uploadDocumentToBlobStorage(
   fileBuffer: Buffer,
   contentType: string
 ) {
+  // HTTP header values must be ISO-8859-1; percent-encode the filename so
+  // non-ASCII names (e.g. Japanese) don't throw a ByteString conversion error.
   const response = await fetch(uploadUrl, {
     method: "PUT",
     headers: {
       "x-ms-blob-type": "BlockBlob",
-      "x-ms-meta-filename": filename,
+      "x-ms-meta-filename": encodeURIComponent(filename),
       "Content-Type": contentType,
     },
     body: fileBuffer as BodyInit,
