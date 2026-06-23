@@ -175,3 +175,33 @@ export async function listRecentAgreements(limit: number) {
 
   return (await response.json()) as AgreementsListResponse
 }
+
+/**
+ * PATCH /v1/accounts/{accountId}/agreements/{agreementId}
+ *
+ * Experimental: there is no publicly documented update operation for
+ * Agreement Manager agreements, but the Agreement schema has `source_name`
+ * (e.g. "Salesforce") and `source_id` fields, and internal guidance points to
+ * a `linked_data` array. This lets us PATCH an arbitrary (caller-supplied)
+ * body so we can discover which shape the server actually accepts. As with
+ * createBulkUploadJob, fields are sent at the top level (no "body" wrapper).
+ */
+export async function updateAgreement(
+  agreementId: string,
+  patchBody: Record<string, unknown>
+) {
+  const config = getDocusignConfig()
+
+  const response = await docusignFetch(
+    `/v1/accounts/${config.accountId}/agreements/${agreementId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patchBody),
+    }
+  )
+
+  // PATCH may return 200 with the updated agreement, or 204 with no body.
+  const text = await response.text()
+  return { status: response.status, body: text ? JSON.parse(text) : null }
+}
