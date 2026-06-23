@@ -21,6 +21,8 @@ interface AgreementListItem {
   type?: string
   status?: string
   file_name?: string
+  source_name?: string
+  source_id?: string
   metadata?: {
     created_at?: string
   }
@@ -292,6 +294,11 @@ function App() {
                     <p className="text-xs text-muted-foreground">
                       {agreement.metadata?.created_at ?? "作成日不明"}
                     </p>
+                    {(agreement.source_name || agreement.source_id) && (
+                      <p className="text-xs text-primary font-mono truncate">
+                        🔗 {agreement.source_name}: {agreement.source_id}
+                      </p>
+                    )}
                   </div>
                   {agreement.status && (
                     <Badge variant="secondary">{agreement.status}</Badge>

@@ -144,6 +144,8 @@ interface AgreementListItem {
   type?: string
   status?: string
   file_name?: string
+  source_name?: string
+  source_id?: string
   metadata?: {
     created_at?: string
   }
