@@ -42,7 +42,7 @@ function App() {
 
   const [linkAgreementId, setLinkAgreementId] = useState("")
   const [linkPatch, setLinkPatch] = useState(
-    '{\n  "source_name": "Salesforce",\n  "source_id": "006XXXXXXXXXXXXXXX"\n}'
+    '{\n  "linked_data": [\n    {\n      "application_name": "Salesforce",\n      "object_name": "Opportunity",\n      "record_id": "006al00000PmxicAAB"\n    }\n  ]\n}'
   )
   const [linkLoading, setLinkLoading] = useState(false)
   const [linkResult, setLinkResult] = useState<string | null>(null)
@@ -142,6 +142,26 @@ function App() {
         throw new Error(data.detail || data.error || "PATCHに失敗しました。")
       }
       setLinkResult(JSON.stringify(data.result, null, 2))
+    } catch (error) {
+      setLinkError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setLinkLoading(false)
+    }
+  }
+
+  const handleInspectAgreement = async () => {
+    setLinkLoading(true)
+    setLinkError(null)
+    setLinkResult(null)
+    try {
+      const response = await fetch(
+        `/api/docusign/agreement?id=${encodeURIComponent(linkAgreementId.trim())}`
+      )
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || "取得に失敗しました。")
+      }
+      setLinkResult(JSON.stringify(data, null, 2))
     } catch (error) {
       setLinkError(error instanceof Error ? error.message : String(error))
     } finally {
@@ -372,12 +392,12 @@ function App() {
             </Alert>
           )}
         </CardContent>
-        <CardFooter>
+        <CardFooter className="flex gap-2">
           <Button
             onClick={handleLinkAgreement}
             disabled={linkLoading || !linkAgreementId.trim()}
             variant="outline"
-            className="w-full"
+            className="flex-1"
           >
             {linkLoading ? (
               <>
@@ -386,6 +406,14 @@ function App() {
             ) : (
               "PATCHを送信"
             )}
+          </Button>
+          <Button
+            onClick={handleInspectAgreement}
+            disabled={linkLoading || !linkAgreementId.trim()}
+            variant="outline"
+            className="flex-1"
+          >
+            生JSONを取得
           </Button>
         </CardFooter>
       </Card>
