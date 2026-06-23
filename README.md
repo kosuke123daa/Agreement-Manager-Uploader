@@ -94,14 +94,14 @@ vercel dev
 
 | 処理 | メソッド・パス |
 |---|---|
-| ジョブ作成（アップロード先URL取得） | `POST /v1/accounts/{accountId}/upload/jobs`（リクエストボディは空の `{}` でよい。ファイル名はこのリクエストでは送らず、後述のBlob StorageへのPUT時に `x-ms-meta-filename` ヘッダーで渡す） |
+| ジョブ作成（アップロード先URL取得） | `POST /v1/accounts/{accountId}/upload/jobs`（リクエストボディは `{ "expected_number_of_docs": 1, "job_name": "...", "language": "en-US" }`。`expected_number_of_docs` が必須。ファイル名はこのリクエストでは送らず、後述のBlob StorageへのPUT時に `x-ms-meta-filename` ヘッダーで渡す） |
 | ファイル本体のアップロード | `PUT <ジョブ作成レスポンスの _embedded.documents[]._actions.upload_document>`（Azure Blob Storageへ直接。`x-ms-blob-type: BlockBlob` ヘッダーが必須、Docusignの認証ヘッダーは不要） |
 | アップロード完了通知 | `POST /v1/accounts/{accountId}/upload/jobs/{jobId}/actions/complete` |
 | ジョブステータス確認 | `GET /v1/accounts/{accountId}/upload/jobs/{jobId}` |
 
 （補足1: 一時的に `/jobs/bulk` というパスに変更していましたが、これは500エラーのレスポンスボディに含まれていた `"path"` フィールド（サーバー内部のルーティング情報で、公開APIパスではなかった）を誤って参照したための誤りでした。正しい公開APIパスは `/upload/jobs` です。）
 
-（補足2: ジョブ作成リクエストのボディに `{ documents: [{ name: ... }] }` のようなファイル名情報を含めていましたが、これも500エラーの原因でした。正しくは空ボディ `{}` でジョブを作成し、レスポンスの `_embedded.documents[]._actions.upload_document`（文字列のURL）にファイルをPUTする際、ファイル名は `x-ms-meta-filename` ヘッダーで渡します。）
+（補足2: ジョブ作成リクエストのボディは `{ "expected_number_of_docs": 1, ... }` の形でトップレベルにフィールドを置きます。公式リファレンスのcurl例は `{ "body": {} }` のように `"body"` キーでラップしていますが、**これは誤りで、そのまま送ると500エラー（レスポンスの `path` が `/jobs/bulk` になる）になります**。ラッパーを外し、`expected_number_of_docs`（必須・アップロード予定ファイル数）をトップレベルに置くのが正解です。レスポンスの `_embedded.documents[]._actions.upload_document`（文字列のURL）にファイルをPUTする際、ファイル名は `x-ms-meta-filename` ヘッダーで渡します。）
 
 ## 6. 制限事項・確認すべき点
 

@@ -69,19 +69,25 @@ async function docusignFetch(path: string, init: RequestInit) {
   return response
 }
 
-export async function createBulkUploadJob() {
+export async function createBulkUploadJob(jobName?: string) {
   const config = getDocusignConfig()
 
-  // Docusign's own curl example wraps the (empty) payload in a "body" key:
-  //   --data-raw '{ "body": {} }'
-  // The filename itself is supplied later via the x-ms-meta-filename header
-  // when uploading to the presigned blob URL, not in this request.
+  // IMPORTANT: do NOT wrap the payload in a "body" key. Docusign's official
+  // reference shows `--data-raw '{ "body": {} }'`, but that example is wrong
+  // and causes a 500 Internal Server Error (the response echoes a path of
+  // `/jobs/bulk`). The fields must be placed at the top level instead.
+  // `expected_number_of_docs` is required; the filename itself is supplied
+  // later via the x-ms-meta-filename header on the presigned blob PUT.
   const response = await docusignFetch(
     `/v1/accounts/${config.accountId}/upload/jobs`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: {} }),
+      body: JSON.stringify({
+        expected_number_of_docs: 1,
+        ...(jobName ? { job_name: jobName } : {}),
+        language: "en-US",
+      }),
     }
   )
 

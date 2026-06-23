@@ -59,7 +59,7 @@ export default async function handler(
       return
     }
 
-    const job = await createBulkUploadJob()
+    const job = await createBulkUploadJob(filename)
     const document = job._embedded.documents[0]
     const uploadUrl = document?._actions.upload_document
     if (!uploadUrl) {
