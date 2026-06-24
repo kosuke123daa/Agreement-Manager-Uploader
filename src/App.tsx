@@ -44,14 +44,6 @@ function App() {
   const [agreementsLoading, setAgreementsLoading] = useState(false)
   const [agreementsError, setAgreementsError] = useState<string | null>(null)
 
-  const [linkAgreementId, setLinkAgreementId] = useState("")
-  const [linkPatch, setLinkPatch] = useState(
-    '{\n  "linked_data": [\n    {\n      "application_name": "Salesforce",\n      "object_name": "Opportunity",\n      "record_id": "006al00000PmxicAAB"\n    }\n  ]\n}'
-  )
-  const [linkLoading, setLinkLoading] = useState(false)
-  const [linkResult, setLinkResult] = useState<string | null>(null)
-  const [linkError, setLinkError] = useState<string | null>(null)
-
   const handleFile = useCallback((selected: File | null) => {
     setState("idle")
     setMessage(null)
@@ -134,56 +126,6 @@ function App() {
       setAgreements(null)
     } finally {
       setAgreementsLoading(false)
-    }
-  }
-
-  const handleLinkAgreement = async () => {
-    setLinkLoading(true)
-    setLinkError(null)
-    setLinkResult(null)
-    let patch: unknown
-    try {
-      patch = JSON.parse(linkPatch)
-    } catch {
-      setLinkError("PATCHボディが正しいJSONではありません。")
-      setLinkLoading(false)
-      return
-    }
-    try {
-      const response = await fetch("/api/docusign/link-agreement", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agreementId: linkAgreementId.trim(), patch }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.detail || data.error || "PATCHに失敗しました。")
-      }
-      setLinkResult(JSON.stringify(data.result, null, 2))
-    } catch (error) {
-      setLinkError(error instanceof Error ? error.message : String(error))
-    } finally {
-      setLinkLoading(false)
-    }
-  }
-
-  const handleInspectAgreement = async () => {
-    setLinkLoading(true)
-    setLinkError(null)
-    setLinkResult(null)
-    try {
-      const response = await fetch(
-        `/api/docusign/agreement?id=${encodeURIComponent(linkAgreementId.trim())}`
-      )
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.detail || data.error || "取得に失敗しました。")
-      }
-      setLinkResult(JSON.stringify(data, null, 2))
-    } catch (error) {
-      setLinkError(error instanceof Error ? error.message : String(error))
-    } finally {
-      setLinkLoading(false)
     }
   }
 
@@ -340,9 +282,7 @@ function App() {
               {agreements.map((agreement) => (
                 <li
                   key={agreement.id}
-                  onClick={() => setLinkAgreementId(agreement.id)}
-                  className="flex items-center justify-between gap-2 rounded-md border p-3 text-sm cursor-pointer hover:border-primary/50 transition-colors"
-                  title="クリックでひも付けカードのagreementIdに入力"
+                  className="flex items-center justify-between gap-2 rounded-md border p-3 text-sm"
                 >
                   <div className="min-w-0">
                     <p className="font-medium truncate">
@@ -384,76 +324,6 @@ function App() {
                 <ListChecks /> 最新10件を取得
               </>
             )}
-          </Button>
-        </CardFooter>
-      </Card>
-
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle>Salesforceレコードのひも付け（検証）</CardTitle>
-          <CardDescription>
-            契約書に外部参照（source_name / source_id や linked_data）をPATCHで付与できるか確認します。
-            agreementIdは上の一覧から取得してください。PATCHボディは形を変えて試せます。
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <input
-            type="text"
-            value={linkAgreementId}
-            onChange={(e) => setLinkAgreementId(e.target.value)}
-            placeholder="agreementId (UUID)"
-            className="w-full rounded-md border px-3 py-2 text-sm font-mono"
-          />
-          <textarea
-            value={linkPatch}
-            onChange={(e) => setLinkPatch(e.target.value)}
-            rows={6}
-            spellCheck={false}
-            className="w-full rounded-md border px-3 py-2 text-sm font-mono"
-          />
-
-          {linkError && (
-            <Alert variant="destructive">
-              <XCircle />
-              <AlertTitle>エラー</AlertTitle>
-              <AlertDescription className="break-all">{linkError}</AlertDescription>
-            </Alert>
-          )}
-
-          {linkResult && (
-            <Alert>
-              <CheckCircle2 />
-              <AlertTitle>成功</AlertTitle>
-              <AlertDescription>
-                <pre className="mt-1 whitespace-pre-wrap break-all text-xs">
-                  {linkResult}
-                </pre>
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-        <CardFooter className="flex gap-2">
-          <Button
-            onClick={handleLinkAgreement}
-            disabled={linkLoading || !linkAgreementId.trim()}
-            variant="outline"
-            className="flex-1"
-          >
-            {linkLoading ? (
-              <>
-                <Loader2 className="animate-spin" /> 送信中…
-              </>
-            ) : (
-              "PATCHを送信"
-            )}
-          </Button>
-          <Button
-            onClick={handleInspectAgreement}
-            disabled={linkLoading || !linkAgreementId.trim()}
-            variant="outline"
-            className="flex-1"
-          >
-            生JSONを取得
           </Button>
         </CardFooter>
       </Card>
