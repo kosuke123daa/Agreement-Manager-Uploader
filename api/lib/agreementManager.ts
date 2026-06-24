@@ -199,3 +199,16 @@ export async function listRecentAgreements(limit: number) {
   return (await response.json()) as AgreementsListResponse
 }
 
+// GET /v1/accounts/{accountId}/agreements/{agreementId}
+// Returns the full raw agreement JSON so linked_data etc. can be inspected.
+export async function getAgreement(agreementId: string) {
+  const config = getDocusignConfig()
+
+  const response = await docusignFetch(
+    `/v1/accounts/${config.accountId}/agreements/${agreementId}`,
+    { method: "GET" }
+  )
+
+  return (await response.json()) as Record<string, unknown>
+}
+

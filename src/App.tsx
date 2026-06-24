@@ -44,6 +44,10 @@ function App() {
   const [agreementsLoading, setAgreementsLoading] = useState(false)
   const [agreementsError, setAgreementsError] = useState<string | null>(null)
 
+  const [inspectingId, setInspectingId] = useState<string | null>(null)
+  const [inspectResult, setInspectResult] = useState<string | null>(null)
+  const [inspectError, setInspectError] = useState<string | null>(null)
+
   const handleFile = useCallback((selected: File | null) => {
     setState("idle")
     setMessage(null)
@@ -126,6 +130,28 @@ function App() {
       setAgreements(null)
     } finally {
       setAgreementsLoading(false)
+    }
+  }
+
+  const handleInspectAgreement = async (agreementId: string) => {
+    if (inspectingId === agreementId) {
+      setInspectingId(null)
+      return
+    }
+    setInspectingId(agreementId)
+    setInspectResult(null)
+    setInspectError(null)
+    try {
+      const response = await fetch(
+        `/api/docusign/agreement?id=${encodeURIComponent(agreementId)}`
+      )
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || "取得に失敗しました。")
+      }
+      setInspectResult(JSON.stringify(data, null, 2))
+    } catch (error) {
+      setInspectError(error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -280,28 +306,54 @@ function App() {
           {agreements && agreements.length > 0 && (
             <ul className="space-y-2">
               {agreements.map((agreement) => (
-                <li
-                  key={agreement.id}
-                  className="flex items-center justify-between gap-2 rounded-md border p-3 text-sm"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">
-                      {agreement.title || agreement.file_name || agreement.id}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono truncate">
-                      {agreement.id}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {agreement.metadata?.created_at ?? "作成日不明"}
-                    </p>
-                    {(agreement.source_name || agreement.source_id) && (
-                      <p className="text-xs text-primary font-mono truncate">
-                        🔗 {agreement.source_name}: {agreement.source_id}
+                <li key={agreement.id} className="rounded-md border p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">
+                        {agreement.title || agreement.file_name || agreement.id}
                       </p>
-                    )}
+                      <p className="text-xs text-muted-foreground font-mono truncate">
+                        {agreement.id}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {agreement.metadata?.created_at ?? "作成日不明"}
+                      </p>
+                      {(agreement.source_name || agreement.source_id) && (
+                        <p className="text-xs text-primary font-mono truncate">
+                          🔗 {agreement.source_name}: {agreement.source_id}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {agreement.status && (
+                        <Badge variant="secondary">{agreement.status}</Badge>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleInspectAgreement(agreement.id)}
+                      >
+                        {inspectingId === agreement.id ? "閉じる" : "紐付け確認"}
+                      </Button>
+                    </div>
                   </div>
-                  {agreement.status && (
-                    <Badge variant="secondary">{agreement.status}</Badge>
+
+                  {inspectingId === agreement.id && (
+                    <div className="mt-2 border-t pt-2">
+                      {inspectError && (
+                        <p className="text-xs text-destructive break-all">
+                          {inspectError}
+                        </p>
+                      )}
+                      {inspectResult && (
+                        <pre className="whitespace-pre-wrap break-all text-xs">
+                          {inspectResult}
+                        </pre>
+                      )}
+                      {!inspectResult && !inspectError && (
+                        <p className="text-xs text-muted-foreground">取得中…</p>
+                      )}
+                    </div>
                   )}
                 </li>
               ))}
