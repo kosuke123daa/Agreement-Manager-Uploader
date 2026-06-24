@@ -3,6 +3,7 @@ import {
   createBulkUploadJob,
   uploadDocumentToBlobStorage,
   completeBulkUploadJob,
+  type LinkedDataItem,
 } from "../lib/agreementManager.js"
 
 export const config = {
@@ -47,6 +48,24 @@ export default async function handler(
     return
   }
 
+  // Optional: link the uploaded document to an external record (e.g. a
+  // Salesforce Account/Opportunity). The client sends a percent-encoded,
+  // stringified JSON array in the X-Linked-Data header so non-ASCII stays
+  // header-safe; it maps to the `linked_data` ingest metadata.
+  let linkedData: LinkedDataItem[] | undefined
+  const rawLinkedData = req.headers["x-linked-data"]
+  if (typeof rawLinkedData === "string" && rawLinkedData) {
+    try {
+      const parsed = JSON.parse(decodeURIComponent(rawLinkedData))
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        linkedData = parsed as LinkedDataItem[]
+      }
+    } catch {
+      res.status(400).json({ error: "Invalid X-Linked-Data header (must be JSON)" })
+      return
+    }
+  }
+
   try {
     const fileBuffer = await readRawBody(req)
 
@@ -68,7 +87,13 @@ export default async function handler(
       )
     }
 
-    await uploadDocumentToBlobStorage(uploadUrl, filename, fileBuffer, contentType)
+    await uploadDocumentToBlobStorage(
+      uploadUrl,
+      filename,
+      fileBuffer,
+      contentType,
+      linkedData
+    )
     await completeBulkUploadJob(job.id)
 
     res.status(200).json({ jobId: job.id, status: "submitted" })

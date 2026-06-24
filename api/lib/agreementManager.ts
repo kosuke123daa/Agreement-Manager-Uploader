@@ -94,21 +94,42 @@ export async function createBulkUploadJob(jobName?: string) {
   return (await response.json()) as CreateJobResponse
 }
 
+export interface LinkedDataItem {
+  application_name: string
+  object_name: string
+  record_id: string
+}
+
 export async function uploadDocumentToBlobStorage(
   uploadUrl: string,
   filename: string,
   fileBuffer: Buffer,
-  contentType: string
+  contentType: string,
+  linkedData?: LinkedDataItem[]
 ) {
   // HTTP header values must be ISO-8859-1; percent-encode the filename so
   // non-ASCII names (e.g. Japanese) don't throw a ByteString conversion error.
+  const headers: Record<string, string> = {
+    "x-ms-blob-type": "BlockBlob",
+    "x-ms-meta-filename": encodeURIComponent(filename),
+    "Content-Type": contentType,
+  }
+
+  // To link the uploaded document to external records (e.g. a Salesforce
+  // Account/Opportunity) so it shows up against that record, the ingestion
+  // metadata must be supplied AT UPLOAD TIME via the x-ms-meta-metadata
+  // header — a single stringified JSON object holding `linked_data` (same
+  // schema as an Agreement PATCH body). This is the ingest-time entry point;
+  // a post-upload PATCH does not persist linked_data. The JSON stays ASCII
+  // (Salesforce IDs / object names), so it is already ISO-8859-1 safe and is
+  // sent verbatim, matching the documented header format.
+  if (linkedData && linkedData.length > 0) {
+    headers["x-ms-meta-metadata"] = JSON.stringify({ linked_data: linkedData })
+  }
+
   const response = await fetch(uploadUrl, {
     method: "PUT",
-    headers: {
-      "x-ms-blob-type": "BlockBlob",
-      "x-ms-meta-filename": encodeURIComponent(filename),
-      "Content-Type": contentType,
-    },
+    headers,
     body: fileBuffer as BodyInit,
   })
 

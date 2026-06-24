@@ -36,6 +36,10 @@ function App() {
   const [jobId, setJobId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Optional Salesforce link applied at upload time via linked_data metadata.
+  const [sfObjectName, setSfObjectName] = useState("Opportunity")
+  const [sfRecordId, setSfRecordId] = useState("")
+
   const [agreements, setAgreements] = useState<AgreementListItem[] | null>(null)
   const [agreementsLoading, setAgreementsLoading] = useState(false)
   const [agreementsError, setAgreementsError] = useState<string | null>(null)
@@ -73,14 +77,28 @@ function App() {
 
     try {
       setProgress(40)
+      const headers: Record<string, string> = {
+        "Content-Type": file.type || "application/pdf",
+        // HTTP headers must be ISO-8859-1; percent-encode to safely carry
+        // non-ASCII filenames (e.g. Japanese), decoded server-side.
+        "X-Filename": encodeURIComponent(file.name),
+      }
+      // If a Salesforce record was specified, attach it as linked_data so the
+      // document is associated with that record at ingest time.
+      if (sfRecordId.trim() && sfObjectName.trim()) {
+        headers["X-Linked-Data"] = encodeURIComponent(
+          JSON.stringify([
+            {
+              application_name: "Salesforce",
+              object_name: sfObjectName.trim(),
+              record_id: sfRecordId.trim(),
+            },
+          ])
+        )
+      }
       const response = await fetch("/api/docusign/upload", {
         method: "POST",
-        headers: {
-          "Content-Type": file.type || "application/pdf",
-          // HTTP headers must be ISO-8859-1; percent-encode to safely carry
-          // non-ASCII filenames (e.g. Japanese), decoded server-side.
-          "X-Filename": encodeURIComponent(file.name),
-        },
+        headers,
         body: file,
       })
 
@@ -217,6 +235,28 @@ function App() {
                 </p>
               </>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Salesforceレコードとひも付け（任意・linked_dataとして取り込み時に付与）
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={sfObjectName}
+                onChange={(e) => setSfObjectName(e.target.value)}
+                placeholder="オブジェクト名 (例: Opportunity)"
+                className="w-1/3 rounded-md border px-3 py-2 text-sm"
+              />
+              <input
+                type="text"
+                value={sfRecordId}
+                onChange={(e) => setSfRecordId(e.target.value)}
+                placeholder="レコードID (例: 006al00000PmxicAAB)"
+                className="flex-1 rounded-md border px-3 py-2 text-sm font-mono"
+              />
+            </div>
           </div>
 
           {state === "uploading" && <Progress value={progress} />}
