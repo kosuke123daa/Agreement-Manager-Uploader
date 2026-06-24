@@ -204,8 +204,10 @@ export async function listRecentAgreements(limit: number) {
 export async function getAgreement(agreementId: string) {
   const config = getDocusignConfig()
 
+  // include_linked_data=true expands the linked_data array (Salesforce
+  // record references) into the response; without it they are omitted.
   const response = await docusignFetch(
-    `/v1/accounts/${config.accountId}/agreements/${agreementId}`,
+    `/v1/accounts/${config.accountId}/agreements/${agreementId}?include_linked_data=true`,
     { method: "GET" }
   )
 
